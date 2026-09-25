@@ -1,4 +1,4 @@
-/* 8GG gates dial, version 2 (25/09/2026). Replaces the 3D figure of eight on the hero-8 and gates-8 widgets.
+/* 8GG gates dial, version 3 (25/09/2026). Oblong track by default; shape: "ring" gives the version 2 circle. Replaces the 3D figure of eight on the hero-8 and gates-8 widgets.
    Eight lacquered capsule segments in the site's gate colours, raised white badges with Lucide icons,
    a light stream and orb that ride over the ring, phase arcs, contact shadow, studio lighting, centre readout.
    Needs three.js r128 (already loaded by the site).
@@ -11,7 +11,7 @@
    HERO SIZE: the hero canvas is raised to clamp(360px, 30vw, 560px) unless the hero-8 element has data-height.
 
    Options (same contract as createEightScene): host, tip, gates, colors, mode, particles, onGate, onPick,
-   plus icons, tilt (default -0.42), lap (seconds, default 16), centre (false hides the readout). */
+   plus shape ("oblong" default, or "ring"), icons, tilt (default -0.42), lap (seconds, default 16), centre (false hides the readout). */
 (function () {
   /* Lucide icons (ISC licence): user, map, book-text, circle-check, shield-alert, eye, rotate-cw, message-square-text */
   var LUCIDE = [["M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2", "M8.0 7.0a4.0 4.0 0 1 0 8.0 0a4.0 4.0 0 1 0 -8.0 0"], ["M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z", "M15 5.764v15", "M9 3.236v15"], ["M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20", "M8 11h8", "M8 7h6"], ["M2.0 12.0a10.0 10.0 0 1 0 20.0 0a10.0 10.0 0 1 0 -20.0 0", "m16 9-5.5 5.5L8 12"], ["M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z", "M12 8v4", "M12 16h.01"], ["M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0", "M9.0 12.0a3.0 3.0 0 1 0 6.0 0a3.0 3.0 0 1 0 -6.0 0"], ["M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8", "M21 3v5h-5"], ["M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z", "M7 11h10", "M7 15h6", "M7 7h8"]];
@@ -37,10 +37,6 @@
     var TILT = o.tilt == null ? -0.42 : o.tilt, mode = o.mode || "auto", LAP = o.lap || 16, target = 0, alive = true, raf = 0, TAU = Math.PI * 2;
     var RM = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-    // Hero: give the dial a taller stage unless the page sets one.
-    var mountEl = canvas.parentElement;
-    if (mountEl && mountEl.getAttribute("data-8gg") === "hero-8" && !mountEl.getAttribute("data-height")) canvas.style.height = o.heroHeight || "clamp(360px, 30vw, 560px)";
-
     var r = new T.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true, powerPreference: "high-performance" });
     r.setPixelRatio(Math.min(2, window.devicePixelRatio || 1)); r.setClearColor(0x000000, 0);
     r.outputEncoding = T.sRGBEncoding; r.toneMapping = T.LinearToneMapping; r.toneMappingExposure = 0.95;
@@ -51,50 +47,93 @@
     scene.add(new T.HemisphereLight(0xfff6ee, 0xe8cdb8, 0.22));
     var key = new T.DirectionalLight(0xffffff, 0.75); key.position.set(-2.5, 3.5, 9); key.castShadow = true;
     key.shadow.mapSize.set(2048, 2048); key.shadow.radius = 8; key.shadow.bias = -0.0004; key.shadow.normalBias = 0.02;
-    var sc = key.shadow.camera; sc.left = -3.6; sc.right = 3.6; sc.top = 3.6; sc.bottom = -3.6; sc.near = 1; sc.far = 25;
+    var sc = key.shadow.camera; sc.left = -5; sc.right = 5; sc.top = 5; sc.bottom = -5; sc.near = 1; sc.far = 25;
     scene.add(key);
 
-    var A = 2.0, TUBE = 0.3, GAP = 0.075, ARC = Math.PI / 4 - GAP, FLOW_Z = TUBE + 0.2;
+    // Track: a rounded rectangle (oblong) or a circle, walked clockwise from 12 o'clock
+    var SHAPES = {
+      oblong: { a: 3.1, b: 1.72, rc: 1.12, band: 0.8, depth: 0.34, rp: 0.17, off: 0.64, badge: 0.27 },
+      ring:   { a: 2.0, b: 2.0,  rc: 2.0,  band: 0.6, depth: 0.6,  rp: 0.3,  off: 0.56, badge: 0.205 }
+    };
+    var S = SHAPES[o.shape] || SHAPES.oblong, GAPLEN = 0.13, FLOW_Z = S.depth + 0.22;
     var pivot = new T.Group(), spin = new T.Group(); scene.add(pivot); pivot.add(spin);
-    function midAngle(i) { return Math.PI / 2 - (i + 0.5) * Math.PI / 4; }
-    function ringPoint(u, rad, z, out) { var a = Math.PI / 2 - u * TAU; return (out || new T.Vector3()).set(Math.cos(a) * rad, Math.sin(a) * rad, z); }
+    function makeTrack(a, b, rc) {
+      var sx = a - rc, sy = b - rc, q = Math.PI * rc / 2, L = [sx, q, 2 * sy, q, 2 * sx, q, 2 * sy, q, sx], P = 0; L.forEach(function (l) { P += l; });
+      function at(u, out) {
+        var s = ((u % 1) + 1) % 1 * P, k = 0; while (k < 8 && s > L[k]) { s -= L[k]; k++; }
+        var x, y, tx, ty, th;
+        if (k === 0) { x = s; y = b; tx = 1; ty = 0; }
+        else if (k === 1) { th = Math.PI / 2 - s / rc; x = sx + rc * Math.cos(th); y = sy + rc * Math.sin(th); tx = Math.sin(th); ty = -Math.cos(th); }
+        else if (k === 2) { x = a; y = sy - s; tx = 0; ty = -1; }
+        else if (k === 3) { th = -s / rc; x = sx + rc * Math.cos(th); y = -sy + rc * Math.sin(th); tx = Math.sin(th); ty = -Math.cos(th); }
+        else if (k === 4) { x = sx - s; y = -b; tx = -1; ty = 0; }
+        else if (k === 5) { th = -Math.PI / 2 - s / rc; x = -sx + rc * Math.cos(th); y = -sy + rc * Math.sin(th); tx = Math.sin(th); ty = -Math.cos(th); }
+        else if (k === 6) { x = -a; y = -sy + s; tx = 0; ty = 1; }
+        else if (k === 7) { th = Math.PI - s / rc; x = -sx + rc * Math.cos(th); y = sy + rc * Math.sin(th); tx = Math.sin(th); ty = -Math.cos(th); }
+        else { x = -sx + s; y = b; tx = 1; ty = 0; }
+        out = out || {}; out.x = x; out.y = y; out.tx = tx; out.ty = ty; return out;
+      }
+      return { at: at, P: P };
+    }
+    // Hero: give the dial a taller stage unless the page sets one.
+    var mountEl = canvas.parentElement;
+    if (mountEl && mountEl.getAttribute("data-8gg") === "hero-8" && !mountEl.getAttribute("data-height")) canvas.style.height = o.heroHeight || (S === SHAPES.ring ? "clamp(360px, 30vw, 560px)" : "clamp(340px, 27vw, 520px)");
+    var TRACK = makeTrack(S.a, S.b, S.rc), ARCS = makeTrack(S.a + S.off, S.b + S.off, S.rc + S.off), tmpP = {};
+    function trackPoint(u, dn, z, out) { TRACK.at(u, tmpP); return (out || new T.Vector3()).set(tmpP.x - tmpP.ty * dn, tmpP.y + tmpP.tx * dn, z); }
 
-    // Contact shadow on an invisible floor under the ring
-    var floor = new T.Mesh(new T.PlaneGeometry(9, 9), new T.ShadowMaterial({ opacity: 0.16 }));
-    floor.position.z = -TUBE - 0.02; floor.receiveShadow = true; spin.add(floor);
+    // Contact shadow on an invisible floor under the track
+    var floor = new T.Mesh(new T.PlaneGeometry(16, 12), new T.ShadowMaterial({ opacity: 0.16 }));
+    floor.position.z = -0.02; floor.receiveShadow = true; spin.add(floor);
 
-    // Segments: capsules bent along the ring
+    // Rounded-rectangle profile swept along part of the track
+    var PROF = (function () {
+      var w = S.band / 2, h = S.depth / 2, rr = Math.min(S.rp, w, h), pts = [], n = 6;
+      [[w - rr, h - rr, 0], [-(w - rr), h - rr, Math.PI / 2], [-(w - rr), -(h - rr), Math.PI], [w - rr, -(h - rr), Math.PI * 1.5]].forEach(function (c) {
+        for (var i = 0; i <= n; i++) { var t = c[2] + (i / n) * Math.PI / 2; pts.push([c[0] + rr * Math.cos(t), c[1] + rr * Math.sin(t) + h]); }
+      });
+      return pts;
+    })();
+    function sweep(u0, u1) {
+      var N = Math.max(24, Math.round((u1 - u0) * 900)), NP = PROF.length, pos = [], idx = [], p = {};
+      for (var i = 0; i <= N; i++) {
+        TRACK.at(u0 + (u1 - u0) * i / N, p); var nx = -p.ty, ny = p.tx;
+        for (var j = 0; j < NP; j++) pos.push(p.x + nx * PROF[j][0], p.y + ny * PROF[j][0], PROF[j][1]);
+      }
+      for (i = 0; i < N; i++) for (j = 0; j < NP; j++) { var j2 = (j + 1) % NP, A0 = i * NP + j, B0 = i * NP + j2, C0 = (i + 1) * NP + j, D0 = (i + 1) * NP + j2; idx.push(A0, C0, B0, B0, C0, D0); }
+      [0, N].forEach(function (ii, e) {
+        var base = pos.length / 3; TRACK.at(u0 + (u1 - u0) * ii / N, p); var nx = -p.ty, ny = p.tx;
+        pos.push(p.x, p.y, S.depth / 2); for (var j = 0; j < NP; j++) pos.push(p.x + nx * PROF[j][0], p.y + ny * PROF[j][0], PROF[j][1]);
+        for (j = 0; j < NP; j++) { var j2 = (j + 1) % NP; if (e === 0) idx.push(base, base + 1 + j2, base + 1 + j); else idx.push(base, base + 1 + j, base + 1 + j2); }
+      });
+      var g = new T.BufferGeometry(); g.setAttribute("position", new T.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals(); return g;
+    }
+
     var segs = [], hitList = [];
     for (var i = 0; i < 8; i++) {
       var base = new T.Color(COLORS[i]).convertSRGBToLinear();
-      var mat = new T.MeshPhysicalMaterial({ color: base.clone(), roughness: 0.34, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.1, envMapIntensity: 0.55, emissive: base.clone(), emissiveIntensity: 0 });
-      var a1 = midAngle(i) + ARC / 2, a0 = midAngle(i) - ARC / 2;
-      var curve = new T.Curve(); (function (a0, a1) { curve.getPoint = function (t, out) { var a = a0 + (a1 - a0) * t; return (out || new T.Vector3()).set(Math.cos(a) * A, Math.sin(a) * A, 0); }; })(a0, a1);
-      var seg = new T.Group();
-      var body = new T.Mesh(new T.TubeGeometry(curve, 72, TUBE, 48, false), mat); body.castShadow = true; body.receiveShadow = true; seg.add(body);
-      [a0, a1].forEach(function (a) { var cap = new T.Mesh(new T.CircleGeometry(TUBE, 48), mat); cap.position.set(Math.cos(a) * A, Math.sin(a) * A, 0); cap.lookAt(cap.position.x - Math.sin(a) * (a === a0 ? 1 : -1), cap.position.y + Math.cos(a) * (a === a0 ? 1 : -1), 0); cap.castShadow = true; seg.add(cap); });
-      // Raised badge with the icon, kept upright
-      var badge = new T.Group();
-      var disc = new T.Mesh(new T.CylinderGeometry(0.205, 0.205, 0.06, 64), new T.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.38, clearcoat: 0.6, clearcoatRoughness: 0.25, envMapIntensity: 0.8 }));
+      var mat = new T.MeshPhysicalMaterial({ color: base.clone(), roughness: 0.34, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.1, envMapIntensity: 0.55, emissive: base.clone(), emissiveIntensity: 0, side: T.DoubleSide });
+      var gu = GAPLEN / 2 / TRACK.P, su0 = i / 8 + gu, su1 = (i + 1) / 8 - gu;
+      var seg = new T.Group(), body = new T.Mesh(sweep(su0, su1), mat); body.castShadow = true; body.receiveShadow = true; seg.add(body);
+      var badge = new T.Group(), BR = S.badge;
+      var disc = new T.Mesh(new T.CylinderGeometry(BR, BR, 0.06, 64), new T.MeshPhysicalMaterial({ color: 0xffffff, roughness: 0.38, clearcoat: 0.6, clearcoatRoughness: 0.25, envMapIntensity: 0.8 }));
       disc.rotation.x = Math.PI / 2; disc.castShadow = true; badge.add(disc);
       var ic = document.createElement("canvas"); ic.width = ic.height = 512; var ix = ic.getContext("2d");
       ix.translate(256 - 150, 256 - 150); ix.scale(300 / 24, 300 / 24); ix.strokeStyle = COLORS[i]; ix.lineWidth = 2.1; ix.lineCap = "round"; ix.lineJoin = "round";
       [].concat(ICONS[i] || []).forEach(function (d) { try { ix.stroke(new Path2D(d)); } catch (e) {} });
       var itex = new T.CanvasTexture(ic); itex.encoding = T.sRGBEncoding; itex.anisotropy = maxAniso;
-      var face = new T.Mesh(new T.CircleGeometry(0.2, 64), new T.MeshBasicMaterial({ map: itex, transparent: true, toneMapped: false, depthWrite: false }));
+      var face = new T.Mesh(new T.CircleGeometry(BR * 0.97, 64), new T.MeshBasicMaterial({ map: itex, transparent: true, toneMapped: false, depthWrite: false }));
       face.position.z = 0.032; badge.add(face);
-      badge.position.set(Math.cos(midAngle(i)) * A, Math.sin(midAngle(i)) * A, TUBE + 0.005);
-      seg.add(badge);
-      seg.userData = { i: i, u: (i + 0.5) / 8, k: 0, h: 0, base: base, mat: mat, badge: badge };
-      body.userData.seg = seg; hitList.push(body); seg.children.forEach(function (c) { c.userData.seg = seg; if (c !== badge) hitList.push(c); });
+      trackPoint((i + 0.5) / 8, 0, S.depth + 0.005, badge.position); seg.add(badge);
+      TRACK.at((i + 0.5) / 8, tmpP);
+      seg.userData = { i: i, u: (i + 0.5) / 8, k: 0, h: 0, base: base, mat: mat, badge: badge, nx: -tmpP.ty, ny: tmpP.tx };
+      body.userData.seg = seg; hitList.push(body);
       spin.add(seg); segs.push(seg);
     }
 
     // Phase arcs: solid orange for gates 1 to 5, dashed teal for 6 to 8
-    var RA = A + 0.56;
-    function arcTube(u0, u1, col, rad, n) { var c = new T.Curve(); c.getPoint = function (t, out) { return ringPoint(u0 + (u1 - u0) * t, RA, 0, out); }; var m = new T.Mesh(new T.TubeGeometry(c, n, rad, 12, false), new T.MeshStandardMaterial({ color: new T.Color(col).convertSRGBToLinear(), roughness: 0.4, envMapIntensity: 0.6 })); spin.add(m); }
-    arcTube(0.004, 5 / 8 - 0.004, "#E8823A", 0.024, 160);
-    for (var k = 0; k < 18; k++) { var du = (3 / 8 - 0.008) / 18; arcTube(5 / 8 + 0.004 + k * du, 5 / 8 + 0.004 + k * du + du * 0.55, "#56C6C6", 0.022, 8); }
+    function arcTube(u0, u1, col, rad, n) { var c = new T.Curve(); c.getPoint = function (t, out) { ARCS.at(u0 + (u1 - u0) * t, tmpP); return (out || new T.Vector3()).set(tmpP.x, tmpP.y, 0.02); }; var m = new T.Mesh(new T.TubeGeometry(c, n, rad, 12, false), new T.MeshStandardMaterial({ color: new T.Color(col).convertSRGBToLinear(), roughness: 0.4, envMapIntensity: 0.6 })); spin.add(m); }
+    arcTube(0.004, 5 / 8 - 0.004, "#E8823A", 0.024, 240);
+    for (var k = 0; k < 20; k++) { var du = (3 / 8 - 0.008) / 20; arcTube(5 / 8 + 0.004 + k * du, 5 / 8 + 0.004 + k * du + du * 0.55, "#56C6C6", 0.022, 10); }
 
     // Light stream riding over the ring, brightest just behind the orb
     var NP = Math.min(o.particles || 1400, 1600), ppos = new Float32Array(NP * 3), pcol = new Float32Array(NP * 3), off = [], jit = [], spd = [], hue = [];
@@ -135,9 +174,9 @@
 
     function size() {
       W = canvas.clientWidth || 1; H = canvas.clientHeight || 1; r.setSize(W, H, false); cam.aspect = W / H;
-      var R = RA + 0.06, t = Math.abs(TILT), halfH = R * Math.cos(t) + (TUBE + 0.45) * Math.sin(t), tan = Math.tan(cam.fov * Math.PI / 360);
-      var d = Math.max(halfH / tan, R / (tan * cam.aspect)) * 1.03; cam.position.set(0, 0, d); cam.lookAt(0, 0, 0); cam.updateProjectionMatrix();
-      ringPx = Math.min(W, H * R / halfH) * (A * 2 / (R * 2)); placeCentre();
+      var hw = S.a + S.off + 0.08, hh0 = S.b + S.off + 0.08, t = Math.abs(TILT), halfH = hh0 * Math.cos(t) + (S.depth + 0.45) * Math.sin(t), tan = Math.tan(cam.fov * Math.PI / 360);
+      var d = Math.max(halfH / tan, hw / (tan * cam.aspect)) * 1.07; cam.position.set(0, 0, d); cam.lookAt(0, 0, 0); cam.updateProjectionMatrix();
+      var pxPerUnit = Math.min(W / (2 * hw), H / (2 * halfH)); ringPx = Math.min(S.a, S.b) * 2 * pxPerUnit; placeCentre();
     }
     size(); var ro = window.ResizeObserver ? new ResizeObserver(size) : null; if (ro) ro.observe(canvas);
 
@@ -146,7 +185,7 @@
       var bb = canvas.getBoundingClientRect(), hb = host.getBoundingClientRect();
       var px = (e.clientX - bb.left) / bb.width, py = (e.clientY - bb.top) / bb.height;
       m.tx = (px - 0.5) * 2; m.ty = (py - 0.5) * 2; m.nx = px * 2 - 1; m.ny = -(py * 2 - 1); m.sx = e.clientX - hb.left; m.sy = e.clientY - hb.top;
-      if (m.drag) { m.spinV = -(e.clientX - m.lx) * 0.005; m.spin += m.spinV; m.lx = e.clientX; }
+      if (m.drag) { m.spinV = -(e.clientX - m.lx) * (o.shape === "ring" ? 0.005 : 0.0018); m.spin += m.spinV; m.lx = e.clientX; }
     }
     function down(e) { m.dx0 = e.clientX; if (hovered || m.over) { m.drag = true; m.lx = e.clientX; e.preventDefault(); } }
     function click(e) { if (Math.abs(e.clientX - m.dx0) > 5) return; if (hovered && o.onPick) o.onPick(hovered.userData.i); }
@@ -154,8 +193,7 @@
     function leave() { m.tx = 0; m.ty = 0; m.nx = 9; m.ny = 9; m.drag = false; }
     canvas.addEventListener("mousemove", mv); canvas.addEventListener("mousedown", down); window.addEventListener("mouseup", up); canvas.addEventListener("mouseleave", leave); canvas.addEventListener("click", click);
 
-    var ring = new T.Mesh(new T.TorusGeometry(A, TUBE * 1.6, 8, 64), new T.MeshBasicMaterial({ visible: false })); spin.add(ring);
-    var ray = new T.Raycaster(), v2 = new T.Vector2(), tp = new T.Vector3();
+        var ray = new T.Raycaster(), v2 = new T.Vector2(), tp = new T.Vector3();
     var u0 = 0, hovered = null, lastHover = -1, lastGate = -1, last = performance.now(), visible = true, cur = 0;
     var io = window.IntersectionObserver ? new IntersectionObserver(function (en) { visible = en[0].isIntersecting; }) : null; if (io) io.observe(canvas);
 
@@ -168,26 +206,26 @@
       pivot.rotation.set(TILT + m.y * 0.1, m.x * 0.16, 0); spin.rotation.z = m.spin;
       if (mode === "auto" && !RM) u0 = (u0 + dt / LAP) % 1;
       else { var goal = segs[target].userData.u - 0.012, du = goal - u0; du -= Math.floor(du); if (du > 0.5) du -= 1; u0 = (u0 + du * Math.min(1, dt * 3) + 1) % 1; }
-      ringPoint(u0, A, FLOW_Z + 0.02, orb.position);
+      trackPoint(u0, 0, FLOW_Z + 0.02, orb.position);
       var col = pgeo.attributes.color.array;
       for (var i = 0; i < NP; i++) {
-        var uu = (off[i] + t * 0.018 * spd[i]) % 1; ringPoint(uu, A + jit[i][0], FLOW_Z + jit[i][1], tp);
+        var uu = (off[i] + t * 0.018 * spd[i]) % 1; trackPoint(uu, jit[i][0], FLOW_Z + jit[i][1], tp);
         ppos[i * 3] = tp.x; ppos[i * 3 + 1] = tp.y; ppos[i * 3 + 2] = tp.z;
         var behind = u0 - uu; behind -= Math.floor(behind); var tail = Math.exp(-behind / 0.09);
-        var br = 0.06 + 0.94 * tail; tmpC.copy(CA).lerp(CB, hue[i] * 0.6 + tail * 0.4).multiplyScalar(br);
+        var br = tail; tmpC.copy(CA).lerp(CB, hue[i] * 0.6 + tail * 0.4).multiplyScalar(br);
         col[i * 3] = tmpC.r; col[i * 3 + 1] = tmpC.g; col[i * 3 + 2] = tmpC.b;
       }
       pgeo.attributes.position.needsUpdate = true; pgeo.attributes.color.needsUpdate = true;
       hovered = null; m.over = false;
-      if (m.nx < 5 && Math.abs(m.nx) <= 1 && Math.abs(m.ny) <= 1) { v2.set(m.nx, m.ny); ray.setFromCamera(v2, cam); var h = ray.intersectObjects(hitList)[0]; if (h) hovered = h.object.userData.seg; m.over = !!ray.intersectObject(ring)[0]; }
+      if (m.nx < 5 && Math.abs(m.nx) <= 1 && Math.abs(m.ny) <= 1) { v2.set(m.nx, m.ny); ray.setFromCamera(v2, cam); var h = ray.intersectObjects(hitList)[0]; if (h) hovered = h.object.userData.seg; m.over = !!h; }
       canvas.style.cursor = m.drag ? "grabbing" : hovered ? "pointer" : m.over ? "grab" : "";
       if (mode === "auto") { var best = 9; for (var q = 0; q < 8; q++) { var dd = u0 - segs[q].userData.u + 0.02; dd -= Math.floor(dd); if (dd < best) { best = dd; cur = q; } } } else cur = target;
       segs.forEach(function (g) {
         var d = g.userData, on = d.i === cur ? 1 : 0;
         d.k += (on - d.k) * 0.08; d.h += ((g === hovered ? 1 : 0) - d.h) * 0.15;
-        g.position.z = d.k * 0.2 + d.h * 0.08;
+        var lift = d.k * 0.18 + d.h * 0.07, pushOut = d.k * 0.08; g.position.set(d.nx * pushOut, d.ny * pushOut, lift);
         d.mat.emissiveIntensity = d.k * 0.22 + d.h * 0.1;
-        var s = 1 + d.k * 0.035; g.scale.set(s, s, s);
+        
         d.badge.rotation.z = -m.spin;
       });
       showCentre(cur);
