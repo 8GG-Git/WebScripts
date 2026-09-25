@@ -1,4 +1,4 @@
-/* 8GG gates dial, version 3 (25/09/2026). Oblong track by default; shape: "ring" gives the version 2 circle. Replaces the 3D figure of eight on the hero-8 and gates-8 widgets.
+/* 8GG gates dial, version 3.1 (25/09/2026). Badges centred on each tile as seen from the camera, flatter default tilt (-0.3). Oblong track by default; shape: "ring" gives the version 2 circle. Replaces the 3D figure of eight on the hero-8 and gates-8 widgets.
    Eight lacquered capsule segments in the site's gate colours, raised white badges with Lucide icons,
    a light stream and orb that ride over the ring, phase arcs, contact shadow, studio lighting, centre readout.
    Needs three.js r128 (already loaded by the site).
@@ -11,7 +11,7 @@
    HERO SIZE: the hero canvas is raised to clamp(360px, 30vw, 560px) unless the hero-8 element has data-height.
 
    Options (same contract as createEightScene): host, tip, gates, colors, mode, particles, onGate, onPick,
-   plus shape ("oblong" default, or "ring"), icons, tilt (default -0.42), lap (seconds, default 16), centre (false hides the readout). */
+   plus shape ("oblong" default, or "ring"), icons, tilt (default -0.3), lap (seconds, default 16), centre (false hides the readout). */
 (function () {
   /* Lucide icons (ISC licence): user, map, book-text, circle-check, shield-alert, eye, rotate-cw, message-square-text */
   var LUCIDE = [["M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2", "M8.0 7.0a4.0 4.0 0 1 0 8.0 0a4.0 4.0 0 1 0 -8.0 0"], ["M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z", "M15 5.764v15", "M9 3.236v15"], ["M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H19a1 1 0 0 1 1 1v18a1 1 0 0 1-1 1H6.5a1 1 0 0 1 0-5H20", "M8 11h8", "M8 7h6"], ["M2.0 12.0a10.0 10.0 0 1 0 20.0 0a10.0 10.0 0 1 0 -20.0 0", "m16 9-5.5 5.5L8 12"], ["M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z", "M12 8v4", "M12 16h.01"], ["M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0", "M9.0 12.0a3.0 3.0 0 1 0 6.0 0a3.0 3.0 0 1 0 -6.0 0"], ["M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8", "M21 3v5h-5"], ["M22 17a2 2 0 0 1-2 2H6.828a2 2 0 0 0-1.414.586l-2.202 2.202A.71.71 0 0 1 2 21.286V5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2z", "M7 11h10", "M7 15h6", "M7 7h8"]];
@@ -34,7 +34,7 @@
   function createGatesDial3D(canvas, o) {
     var T = window.THREE; if (!T || !canvas) return null; o = o || {};
     var host = o.host || canvas.parentElement, tip = o.tip, G = o.gates || [], ICONS = o.icons || LUCIDE, COLORS = o.colors || DEF_COLORS;
-    var TILT = o.tilt == null ? -0.42 : o.tilt, mode = o.mode || "auto", LAP = o.lap || 16, target = 0, alive = true, raf = 0, TAU = Math.PI * 2;
+    var TILT = o.tilt == null ? -0.3 : o.tilt, mode = o.mode || "auto", LAP = o.lap || 16, target = 0, alive = true, raf = 0, TAU = Math.PI * 2;
     var RM = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     var r = new T.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true, powerPreference: "high-performance" });
@@ -52,7 +52,7 @@
 
     // Track: a rounded rectangle (oblong) or a circle, walked clockwise from 12 o'clock
     var SHAPES = {
-      oblong: { a: 3.1, b: 1.72, rc: 1.12, band: 0.8, depth: 0.34, rp: 0.17, off: 0.64, badge: 0.27 },
+      oblong: { a: 3.1, b: 1.72, rc: 1.12, band: 0.9, depth: 0.3, rp: 0.13, off: 0.68, badge: 0.24 },
       ring:   { a: 2.0, b: 2.0,  rc: 2.0,  band: 0.6, depth: 0.6,  rp: 0.3,  off: 0.56, badge: 0.205 }
     };
     var S = SHAPES[o.shape] || SHAPES.oblong, GAPLEN = 0.13, FLOW_Z = S.depth + 0.22;
@@ -123,7 +123,7 @@
       var itex = new T.CanvasTexture(ic); itex.encoding = T.sRGBEncoding; itex.anisotropy = maxAniso;
       var face = new T.Mesh(new T.CircleGeometry(BR * 0.97, 64), new T.MeshBasicMaterial({ map: itex, transparent: true, toneMapped: false, depthWrite: false }));
       face.position.z = 0.032; badge.add(face);
-      trackPoint((i + 0.5) / 8, 0, S.depth + 0.005, badge.position); seg.add(badge);
+      trackPoint((i + 0.5) / 8, 0, S.depth + 0.005, badge.position); badge.userData.base = badge.position.clone(); seg.add(badge);
       TRACK.at((i + 0.5) / 8, tmpP);
       seg.userData = { i: i, u: (i + 0.5) / 8, k: 0, h: 0, base: base, mat: mat, badge: badge, nx: -tmpP.ty, ny: tmpP.tx };
       body.userData.seg = seg; hitList.push(body);
@@ -203,7 +203,7 @@
       if (!visible) return;
       m.x += (m.tx - m.x) * 0.05; m.y += (m.ty - m.y) * 0.05;
       if (!m.drag) { m.spinV *= 0.94; m.spin += m.spinV; m.spin *= 0.985; }
-      pivot.rotation.set(TILT + m.y * 0.1, m.x * 0.16, 0); spin.rotation.z = m.spin;
+      pivot.rotation.set(TILT + m.y * 0.1, m.x * 0.16, 0); var badgeShift = S.depth * Math.tan(Math.abs(TILT + m.y * 0.1)) * 0.5; spin.rotation.z = m.spin;
       if (mode === "auto" && !RM) u0 = (u0 + dt / LAP) % 1;
       else { var goal = segs[target].userData.u - 0.012, du = goal - u0; du -= Math.floor(du); if (du > 0.5) du -= 1; u0 = (u0 + du * Math.min(1, dt * 3) + 1) % 1; }
       trackPoint(u0, 0, FLOW_Z + 0.02, orb.position);
@@ -223,10 +223,10 @@
       segs.forEach(function (g) {
         var d = g.userData, on = d.i === cur ? 1 : 0;
         d.k += (on - d.k) * 0.08; d.h += ((g === hovered ? 1 : 0) - d.h) * 0.15;
-        var lift = d.k * 0.18 + d.h * 0.07, pushOut = d.k * 0.08; g.position.set(d.nx * pushOut, d.ny * pushOut, lift);
+        var lift = d.k * 0.18 + d.h * 0.07, pushOut = d.k * 0.04; g.position.set(d.nx * pushOut, d.ny * pushOut, lift);
         d.mat.emissiveIntensity = d.k * 0.22 + d.h * 0.1;
         
-        d.badge.rotation.z = -m.spin;
+        d.badge.rotation.z = -m.spin; var bb = d.badge.userData.base; d.badge.position.set(bb.x, bb.y - badgeShift, bb.z);
       });
       showCentre(cur);
       if (tip) {
